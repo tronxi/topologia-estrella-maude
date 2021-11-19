@@ -32,14 +32,18 @@ fmod HASH is
     op __ : Hash Hash -> Hash [ctor assoc comm id: hashVacio] . 
 
     var S : String .
-    var N : Nat .
+    var N N' : Nat .
     var H : Hash .
 
     op getValue : Hash String ~> Nat .
     eq getValue( H < S , N > , S ) = N .
 
-endfm
+    op insert : Hash String Nat -> Hash .
+    eq insert( < S, N > H, S, N') = H < S , N' > .
+    eq insert(H, S, N) = H < S , N > [owise].
 
+endfm
+red insert (< "2", 2 > < "1", 1 > , "1", 2)  .
 fmod RED is
     pr NAT .
     pr STRING .
@@ -116,9 +120,16 @@ mod COMPORTAMIENTO is
         { IdLocCentro | Cont1, centro(IdNodCentro, Hash, activo)}
         { IdLoc1 | Cont2, to IdNod1 : Str2}
         if getValue(Hash, IdNod1) == IdLoc1 .
+    
+    rl [creaInfo] :
+        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, inactivo, List1, Str1) }
+        { IdLocCentro | Cont2, centro(IdNodCentro, Hash, Estado1)}
+        =>
+        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, esperando, List1, Str1), info(IdLocCentro, IdLoc1, IdNod1) }
+        { IdLocCentro | Cont2, centro(IdNodCentro, Hash, Estado1)} .
 
     rl [enviaInfo] :
-        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, inactivo, List1, Str1) }
+        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, esperando, List1, Str1),  info(IdLocCentro, IdLoc1, IdNod1) }
         { IdLocCentro | Cont2, centro(IdNodCentro, Hash, Estado1)}
         =>
         { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, esperando, List1, Str1) }
@@ -128,8 +139,15 @@ mod COMPORTAMIENTO is
         { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, esperando, List1, Str1) }
         { IdLocCentro | Cont2, centro(IdNodCentro, Hash, activo), info(IdLocCentro, IdLoc1, IdNod1)}
         =>
-        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, esperando, List1, Str1), respuesta-info(IdNod1) }
-        { IdLocCentro | Cont2, centro(IdNodCentro, Hash < IdNod1 , IdLoc1 >, activo)} .
+        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, esperando, List1, Str1)}
+        { IdLocCentro | Cont2, centro(IdNodCentro, insert(Hash, IdNod1, IdLoc1), activo), respuesta-info(IdNod1) } .
+
+    rl [centroEnviaRespuestaInfo] :
+        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, esperando, List1, Str1) }
+        { IdLocCentro | Cont2, centro(IdNodCentro, Hash, activo), respuesta-info(IdNod1)}
+        =>
+        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, esperando, List1, Str1),  respuesta-info(IdNod1)}
+        { IdLocCentro | Cont2, centro(IdNodCentro, Hash, activo) } .
 
     rl [activaExtremo] :
         extremo(IdNod1, IdLocCentro, esperando, List1, Str1), respuesta-info(IdNod1)
@@ -212,16 +230,16 @@ mod TEST is
                 {3 | extremo("3", 0, activo, listaVacia, "holahola")} .
 endm
 
-rew init .
-search init =>! S:Sistema s.t. numNodos(S:Sistema) =/= numNodos(init) .
+--- rew init .
+--- search init =>! S:Sistema s.t. numNodos(S:Sistema) =/= numNodos(init) .
 
 search init =>+ S:Sistema s.t. S:Sistema == final .
 
 
-red modelCheck(init, cantidadNodos(4) -> []cantidadNodos(4)) .
+--- red modelCheck(init, cantidadNodos(4) -> []cantidadNodos(4)) .
 
-red modelCheck(init, [](existeNodo("2") /\ existeNodo("1") /\ esAmigo("1", "2") -> <>(existeTo("2")))) .
+--- red modelCheck(init, [](existeNodo("2") /\ existeNodo("1") /\ esAmigo("1", "2") -> <>(existeTo("2")))) .
 
-red modelCheck(init, [](existeTo("2") -> <>(~(existeTo("2"))))) .
+--- red modelCheck(init, [](existeTo("2") -> <>(~(existeTo("2"))))) .
 
 q
