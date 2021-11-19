@@ -1,0 +1,217 @@
+fmod LISTA is
+    pr STRING .
+    pr NAT .
+    sort Lista .
+    subsort String < Lista .
+
+    op listaVacia : -> Lista [ctor] .
+    op __ : Lista Lista -> Lista [ctor assoc id: listaVacia] .
+
+    var S : String .
+    var List : Lista .
+
+    op head : Lista ~> String .
+    eq head(S List) = S .
+
+    op tail : Lista -> Lista .
+    eq tail(S List) = List .
+
+    op size : Lista -> Nat .
+    eq size(listaVacia) = 0 .
+    eq size(S List) = s(size(List)) .
+endfm
+
+fmod HASH is
+    pr STRING . 
+    pr NAT .
+    sorts Tupla Hash .
+    subsort Tupla < Hash .
+
+    op < _ , _ > : String Nat -> Tupla [ctor] .
+    op hashVacio : -> Hash [ctor] .
+    op __ : Hash Hash -> Hash [ctor assoc comm id: hashVacio] . 
+
+    var S : String .
+    var N : Nat .
+    var H : Hash .
+
+    op getValue : Hash String ~> Nat .
+    eq getValue( H < S , N > , S ) = N .
+
+endfm
+
+fmod RED is
+    pr NAT .
+    pr STRING .
+    pr LISTA .
+    pr HASH .
+
+    sorts Localizacion Sistema Contenidos Nodo Msj Estado .
+    subsort Localizacion < Sistema .
+
+    subsort Nodo Msj < Contenidos .
+    op contenidoVacio : -> Contenidos [ctor] .
+    op _,_ : Contenidos Contenidos -> Contenidos [ctor assoc comm id: contenidoVacio] .
+
+    op none : -> Sistema [ctor] .
+    op {_|_} : Nat Contenidos -> Localizacion [ctor] .
+    op __ : Sistema Sistema -> Sistema [ctor assoc comm id: none] .
+
+    ops inactivo esperando activo : -> Estado [ctor] .
+
+    op extremo : String Nat Estado Lista String -> Nodo [ctor] .
+    op centro : String Hash Estado -> Nodo [ctor] .
+ 
+    op info : Nat Nat String -> Msj [ctor] .
+    op respuesta-info : String -> Msj [ctor] .
+    op to_:_ : String String -> Msj [ctor] .
+
+    var L : Localizacion .
+    var S : Sistema .
+    var Cont : Contenidos .
+    var IdLoc IdLocCentro : Nat .
+    var IdNodo : String .
+    var List : Lista .
+    var Msj : String .
+    var Estado : Estado .
+
+    op numNodos : Sistema -> Nat .
+    eq numNodos(none) = 0 .
+    eq numNodos (L S) = s(numNodos(S)) .
+
+    op numExtremos : Sistema -> Nat .
+    eq numExtremos({IdLoc | extremo(IdNodo, IdLocCentro, Estado, List, Msj), Cont} S) = s(numExtremos(S)) .
+    eq numExtremos(S) = 0 [owise] .
+
+endfm
+
+mod COMPORTAMIENTO is
+    pr RED .
+    
+    vars IdLocCentro IdLoc1 IdLoc2 : Nat .
+    vars IdNodCentro IdNod1 IdNod2 : String .
+    vars List1 List2 : Lista .
+    vars Str1 Str2 : String .
+    vars Cont1 Cont2 : Contenidos .
+    vars Hash : Hash .
+    vars Estado1 : Estado .
+
+    rl [procesaMensaje] :
+        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, activo, List1, Str1), to IdNod1 : Str2 }
+        =>
+        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, activo, List1, Str1 + Str2) } .
+    
+    crl [extremoACentro] :
+        { IdLocCentro | Cont1, centro(IdNodCentro, Hash, activo)}
+        { IdLoc1 | Cont2, extremo(IdNod1, IdLocCentro, activo, List1, Str1), to IdNod2 : Str2}
+        =>
+        { IdLocCentro | Cont1, centro(IdNodCentro, Hash, activo), to IdNod2 : Str2}
+        { IdLoc1 | Cont2, extremo(IdNod1, IdLocCentro, activo, List1, Str1)} 
+        if IdNod1 =/= IdNod2 .
+
+    crl [centroAExtremo] :
+        { IdLocCentro | Cont1, centro(IdNodCentro, Hash, activo), to IdNod1 : Str2}
+        { IdLoc1 | Cont2}
+        =>
+        { IdLocCentro | Cont1, centro(IdNodCentro, Hash, activo)}
+        { IdLoc1 | Cont2, to IdNod1 : Str2}
+        if getValue(Hash, IdNod1) == IdLoc1 .
+
+    rl [enviaInfo] :
+        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, inactivo, List1, Str1) }
+        { IdLocCentro | Cont2, centro(IdNodCentro, Hash, Estado1)}
+        =>
+        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, esperando, List1, Str1) }
+        { IdLocCentro | Cont2, centro(IdNodCentro, Hash, activo), info(IdLocCentro, IdLoc1, IdNod1)} .
+    
+    rl [centroActualiza] :
+        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, esperando, List1, Str1) }
+        { IdLocCentro | Cont2, centro(IdNodCentro, Hash, activo), info(IdLocCentro, IdLoc1, IdNod1)}
+        =>
+        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, esperando, List1, Str1), respuesta-info(IdNod1) }
+        { IdLocCentro | Cont2, centro(IdNodCentro, Hash < IdNod1 , IdLoc1 >, activo)} .
+
+    rl [activaExtremo] :
+        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, esperando, List1, Str1), respuesta-info(IdNod1) }
+        =>
+        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, activo, List1, Str1) } .
+
+    crl [enviaAmigo] :
+        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, activo, List1, Str1) }
+        =>
+        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, activo, List2, Str1), to IdNod2 : "hola"}
+        if size(List1) > 0 /\ IdNod2 := head(List1) /\ List2 := tail(List1) .
+
+
+endm
+
+mod EJEMPLO is
+    pr COMPORTAMIENTO .
+
+    op init : -> Sistema .
+    eq init = 
+            { 0 | centro("0", hashVacio, inactivo)}
+            { 1 | extremo("1", 0, inactivo, "2" "3", "")}
+            { 2 | extremo("2", 0, inactivo, "1" "3", "")}
+            { 3 | extremo("3", 0, inactivo, "1" "2", "")} .
+endm
+
+load model-checker
+
+mod PROPS is
+    pr SATISFACTION .
+    pr COMPORTAMIENTO .
+
+    subsort Sistema < State .
+
+    var IdLoc1 IdLocCentro : Nat .
+    var Hash : Hash .
+    var Estado : Estado .
+    var Sistema : Sistema .
+    var IdNodo IdNodo2 : String .
+    var List List2 : Lista .
+    var Str : String .
+    var Cont : Contenidos .
+    var NumNodos NumExtremos : Nat .
+
+    op existeNodo : String -> Prop [ctor] .
+    eq {IdLoc1 | centro(IdNodo , Hash, Estado), Cont} Sistema |= existeNodo(IdNodo) = true .
+    eq {IdLoc1 | extremo(IdNodo, IdLocCentro, Estado, List, Str), Cont} Sistema |= existeNodo(IdNodo) = true .
+
+    op esAmigo : String String -> Prop [ctor] .
+    eq {IdLoc1 | extremo (IdNodo, IdLocCentro, Estado, List IdNodo2 List2, Str), Cont} Sistema |= esAmigo(IdNodo, IdNodo2) = true .
+
+    op existeTo : String -> Prop [ctor] .
+    eq {IdLoc1 | Cont, to IdNodo : Str} Sistema |= existeTo(IdNodo) = true .
+
+    op cantidadNodos : Nat -> Prop [ctor] .
+    eq Sistema |= cantidadNodos(NumNodos) = numNodos(Sistema) == NumNodos .
+
+    op cantidadExtremos : Nat -> Prop [ctor] .
+    eq Sistema |= cantidadExtremos(NumExtremos) = numExtremos(Sistema) == NumExtremos .
+
+endm
+
+mod TEST is
+    pr PROPS .
+    pr MODEL-CHECKER .
+    pr LTL-SIMPLIFIER .
+
+    op init : -> Sistema .
+    eq init = 
+            { 0 | centro("0", hashVacio, inactivo)}
+            { 1 | extremo("1", 0, inactivo, "2" "3", "")}
+            { 2 | extremo("2", 0, inactivo, "1" "3", "")}
+            { 3 | extremo("3", 0, inactivo, "1" "2", "")} .
+endm
+
+rew init .
+search init =>! S:Sistema s.t. numNodos(S:Sistema) =/= numNodos(init) .
+
+red modelCheck(init, cantidadNodos(4) -> []cantidadNodos(4)) .
+
+--- red modelCheck(init, existeNodo("2") /\ esAmigo("1", "2") -> <>(existeTo("2"))) . ---alguna vez se cumple
+red modelCheck(init, [](existeNodo("2") /\ esAmigo("1", "2") -> <>(existeTo("2")))) . --- siempre se cumple
+
+--- red modelCheck(init, existeTo("2") -> <>(~(existeTo("2")))) . --- alguna vez se cumple
+red modelCheck(init, [](existeTo("2") -> <>(~(existeTo("2"))))) . --- siempre se cumple
