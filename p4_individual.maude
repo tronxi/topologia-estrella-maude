@@ -97,9 +97,9 @@ mod COMPORTAMIENTO is
     vars Estado1 : Estado .
 
     rl [procesaMensaje] :
-        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, activo, List1, Str1), to IdNod1 : Str2 }
+        extremo(IdNod1, IdLocCentro, activo, List1, Str1), to IdNod1 : Str2
         =>
-        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, activo, List1, Str1 + Str2) } .
+        extremo(IdNod1, IdLocCentro, activo, List1, Str1 + Str2) .
     
     crl [extremoACentro] :
         { IdLocCentro | Cont1, centro(IdNodCentro, Hash, activo)}
@@ -132,14 +132,14 @@ mod COMPORTAMIENTO is
         { IdLocCentro | Cont2, centro(IdNodCentro, Hash < IdNod1 , IdLoc1 >, activo)} .
 
     rl [activaExtremo] :
-        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, esperando, List1, Str1), respuesta-info(IdNod1) }
+        extremo(IdNod1, IdLocCentro, esperando, List1, Str1), respuesta-info(IdNod1)
         =>
-        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, activo, List1, Str1) } .
+        extremo(IdNod1, IdLocCentro, activo, List1, Str1).
 
     crl [enviaAmigo] :
-        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, activo, List1, Str1) }
+        extremo(IdNod1, IdLocCentro, activo, List1, Str1)
         =>
-        { IdLoc1 | Cont1, extremo(IdNod1, IdLocCentro, activo, List2, Str1), to IdNod2 : "hola"}
+        extremo(IdNod1, IdLocCentro, activo, List2, Str1), to IdNod2 : "hola"
         if size(List1) > 0 /\ IdNod2 := head(List1) /\ List2 := tail(List1) .
 
 
@@ -203,15 +203,25 @@ mod TEST is
             { 1 | extremo("1", 0, inactivo, "2" "3", "")}
             { 2 | extremo("2", 0, inactivo, "1" "3", "")}
             { 3 | extremo("3", 0, inactivo, "1" "2", "")} .
+
+    op final : -> Sistema .
+    eq final = 
+                {0 | centro("0", < "1",1 > < "2",2 > < "3",3 >, activo)} 
+                {1 | extremo("1", 0, activo, listaVacia, "holahola")} 
+                {2 | extremo("2", 0, activo, listaVacia, "holahola")}
+                {3 | extremo("3", 0, activo, listaVacia, "holahola")} .
 endm
 
 rew init .
 search init =>! S:Sistema s.t. numNodos(S:Sistema) =/= numNodos(init) .
 
+search init =>+ S:Sistema s.t. S:Sistema == final .
+
+
 red modelCheck(init, cantidadNodos(4) -> []cantidadNodos(4)) .
 
---- red modelCheck(init, existeNodo("2") /\ esAmigo("1", "2") -> <>(existeTo("2"))) . ---alguna vez se cumple
-red modelCheck(init, [](existeNodo("2") /\ esAmigo("1", "2") -> <>(existeTo("2")))) . --- siempre se cumple
+red modelCheck(init, [](existeNodo("2") /\ existeNodo("1") /\ esAmigo("1", "2") -> <>(existeTo("2")))) .
 
---- red modelCheck(init, existeTo("2") -> <>(~(existeTo("2")))) . --- alguna vez se cumple
-red modelCheck(init, [](existeTo("2") -> <>(~(existeTo("2"))))) . --- siempre se cumple
+red modelCheck(init, [](existeTo("2") -> <>(~(existeTo("2"))))) .
+
+q
